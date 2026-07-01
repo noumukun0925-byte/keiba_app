@@ -97,6 +97,9 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
 .style-seg button{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:8px 2px;
   border-radius:var(--rss);font-size:12px;font-weight:800;cursor:pointer;font-family:inherit}
 .style-seg button.on{background:var(--blue);color:#fff;border-color:transparent}
+.recent-box{margin-top:11px;padding-top:11px;border-top:1px dashed var(--border)}
+.recent-h{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:7px}
+.recent-in{font-variant-numeric:tabular-nums}
 /* prob bars */
 .pbar-row{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 .pbar-gate{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;border:1px solid rgba(0,0,0,.15)}
@@ -354,6 +357,13 @@ details p{font-size:12px;color:var(--text2);margin-top:9px;line-height:1.75}
     <div class="hint" style="margin-bottom:8px">「勝つと予測した確率」と「実際に勝った割合」が近いほど正確。対角線に近いほど良い較正。</div>
     <canvas id="calibCanvas" height="220"></canvas>
     <div class="hint" id="calibNote" style="margin-top:6px"></div>
+    <div class="divider"></div>
+    <div class="card-t" style="margin-bottom:8px"><span class="ic">🛠️</span>σ自動較正（記録から自己調整）</div>
+    <div id="calibControls"></div>
+  </div>
+  <div class="card">
+    <div class="card-t"><span class="ic">🏅</span>条件別回収率（得意条件を知る）</div>
+    <div id="condBreak"></div>
   </div>
   <div class="card">
     <div class="card-t"><span class="ic">🗂️</span>記録一覧</div>
@@ -497,8 +507,30 @@ function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&!d.sim)d.
 function save(){localStorage.setItem(LS,JSON.stringify(S));}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1700);}
 
-function newHorse(i){return{num:i+1,name:'',star:3,style:'senko',stamina:58,f:{ability:60,form:55,apt:55,draw:50,jockey:55}};}
-function ensureHorses(){const n=+S.race.heads;while(S.horses.length<n)S.horses.push(newHorse(S.horses.length));S.horses.length=n;S.horses.forEach((h,i)=>{h.num=i+1;if(!h.style)h.style='senko';if(h.stamina==null)h.stamina=58;});}
+function newHorse(i){return{num:i+1,name:'',star:3,style:'senko',stamina:58,recent:'',recentClass:'win1',autoScore:null,f:{ability:60,form:55,apt:55,draw:50,jockey:55}};}
+function ensureHorses(){const n=+S.race.heads;while(S.horses.length<n)S.horses.push(newHorse(S.horses.length));S.horses.length=n;S.horses.forEach((h,i)=>{h.num=i+1;if(!h.style)h.style='senko';if(h.stamina==null)h.stamina=58;if(h.recent==null)h.recent='';if(!h.recentClass)h.recentClass='win1';});}
+
+// ---- Recent-form auto-scoring (the working replacement for OCR) ----
+const CLASS_TIER={maiden:0,win1:1,win2:2,win3:3,op:4,g3:5,g2:6,g1:7};
+const CLASS_OPTS=[['maiden','新馬・未勝利'],['win1','1勝クラス'],['win2','2勝クラス'],['win3','3勝クラス'],['op','オープン'],['g3','G3'],['g2','G2'],['g1','G1']];
+// enter last-5 finishing positions (most recent first). Higher-class finishes are worth more.
+function scoreRecent(recentStr,classKey){
+  const fins=(recentStr||'').split(/[^0-9]+/).map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=18).slice(0,5);
+  if(!fins.length)return null;
+  const W=[0.30,0.24,0.20,0.14,0.12];               // recent races weighted higher
+  const tier=CLASS_TIER[classKey]??1;
+  let s=0,wsum=0;
+  fins.forEach((f,i)=>{const w=W[i]||0.1;const base=Math.max(28,104-(f-1)*12);const cls=tier*2.4;s+=w*Math.min(100,base+cls);wsum+=w;});
+  return Math.round(Math.max(20,Math.min(99,s/wsum)));
+}
+function applyRecent(i){
+  const h=S.horses[i];const sc=scoreRecent(h.recent,h.recentClass);
+  if(sc==null){toast('近走の着順を入力（例）1 3 2 5 1');return;}
+  h.autoScore=sc;
+  if(S.mode==='simple')h.star=Math.max(1,Math.min(5,Math.round(sc/20)));
+  else{h.f.ability=sc;h.f.form=Math.max(20,Math.min(99,sc));}
+  save();renderHorseList();toast(`${h.num}番：指数${sc}を反映`);
+}
 function horseScore(h){
   if(S.mode==='simple'){const map={1:30,2:44,3:58,4:73,5:90};return map[h.star]||58;}
   const wsum=S.weights.reduce((a,b)=>a+b,0)||1;let s=0;FACTORS.forEach((f,i)=>{s+=(S.weights[i]/wsum)*(h.f[f.key]??55);});return s;
@@ -560,11 +592,23 @@ function renderHorseList(){
         +`<div class="slider-row"><span class="lbl">スタミナ</span><input type="range" min="0" max="100" value="${h.stamina}" data-h="${i}" data-f="__stamina"><span class="val">${h.stamina}</span></div>`
         +styleSeg(i,h.style);
     }
+    const badge=h.autoScore!=null?`<span class="chip b" style="margin-left:6px">指数${h.autoScore}反映済</span>`:'';
+    const recentBox=`<div class="recent-box">
+        <div class="recent-h">近走オート採点 ${badge}</div>
+        <div class="row" style="gap:7px">
+          <input class="recent-in" data-recent="${i}" placeholder="近5走着順 例)1 3 2 5 1" value="${(h.recent||'').replace(/"/g,'&quot;')}" inputmode="numeric" style="flex:1.4">
+          <select class="recent-cls" data-recentcls="${i}" style="flex:1">${CLASS_OPTS.map(([k,l])=>`<option value="${k}" ${k===h.recentClass?'selected':''}>${l}</option>`).join('')}</select>
+        </div>
+        <button class="btn ghost sm recent-apply" data-recentapply="${i}" style="margin-top:7px;width:100%">近走から自動採点する</button>
+      </div>`;
     el.innerHTML=`<div class="horse-h"><div class="gate" style="${gateStyle(h.num,S.race.heads)}">${h.num}</div>
-      <div class="hname"><input placeholder="馬名（任意）" value="${(h.name||'').replace(/"/g,'&quot;')}" data-name="${i}"></div></div>${body}`;
+      <div class="hname"><input placeholder="馬名（任意）" value="${(h.name||'').replace(/"/g,'&quot;')}" data-name="${i}"></div></div>${body}${recentBox}`;
     list.appendChild(el);
   });
   list.querySelectorAll('input[data-name]').forEach(inp=>inp.oninput=()=>{S.horses[+inp.dataset.name].name=inp.value;save();});
+  list.querySelectorAll('input[data-recent]').forEach(inp=>inp.oninput=()=>{S.horses[+inp.dataset.recent].recent=inp.value;save();});
+  list.querySelectorAll('select[data-recentcls]').forEach(sel=>sel.onchange=()=>{S.horses[+sel.dataset.recentcls].recentClass=sel.value;save();});
+  list.querySelectorAll('[data-recentapply]').forEach(b=>b.onclick=()=>applyRecent(+b.dataset.recentapply));
   list.querySelectorAll('.stars').forEach(sc=>sc.querySelectorAll('.st').forEach(st=>st.onclick=()=>{S.horses[+sc.dataset.star].star=+st.dataset.n;save();renderHorseList();}));
   list.querySelectorAll('.style-seg').forEach(sg=>sg.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.horses[+sg.dataset.styleh].style=b.dataset.k;save();renderHorseList();}));
   list.querySelectorAll('input[type=range][data-h]').forEach(r=>r.oninput=()=>{
@@ -794,7 +838,7 @@ function saveCurrentRace(){
   const topIdx=p.map((x,i)=>i).sort((a,b)=>p[b]-p[a])[0];
   S.records.unshift({id:Date.now(),name:S.race.name||'無名レース',date:new Date().toISOString().slice(0,10),
     heads:S.horses.length,predWinNum:S.horses[topIdx].num,predWinProb:p[topIdx],
-    src:S.sim.result?'sim':'analytic',
+    src:S.sim.result?'sim':'analytic',surface:S.race.surface,dist:parseInt(S.race.dist)||null,memo:'',
     horses:S.horses.map((h,i)=>({num:h.num,name:h.name,winProb:p[i]})),
     settled:false,winNum:null,stake:0,ret:0,hit:null});
   save();toast('予想を保存しました');showView('stats');
@@ -805,7 +849,48 @@ function renderStats(){
   const roiEl=document.getElementById('kRoi');roiEl.textContent=ts>0?(tr/ts*100).toFixed(0)+'%':'—';roiEl.style.color=ts>0?(tr>=ts?'var(--pos)':'var(--neg)'):'';
   document.getElementById('kHit').textContent=settled.length?(hits/settled.length*100).toFixed(0)+'%':'—';
   const net=tr-ts,nEl=document.getElementById('kNet');nEl.textContent=settled.length?((net>=0?'+':'')+'¥'+net.toLocaleString()):'—';nEl.style.color=net>0?'var(--pos)':net<0?'var(--neg)':'';
-  drawPnl();drawCalibration();renderRecordList();
+  drawPnl();drawCalibration();renderCalibControls();renderCondBreakdown();renderRecordList();
+}
+function distBand(d){if(!d)return null;return d<=1400?'短距離':d<1800?'マイル':d<2200?'中距離':'長距離';}
+function renderCondBreakdown(){
+  const box=document.getElementById('condBreak');if(!box)return;
+  const rec=S.records.filter(r=>r.settled&&r.stake>0);
+  if(!rec.length){box.innerHTML='<div class="empty">賭け金つきの確定記録が貯まると、条件別の得意・不得意が見えます。</div>';return;}
+  const groups={};
+  const push=(key,r)=>{(groups[key]=groups[key]||{n:0,hit:0,stake:0,ret:0});groups[key].n++;if(r.hit)groups[key].hit++;groups[key].stake+=+r.stake;groups[key].ret+=+r.ret;};
+  rec.forEach(r=>{
+    if(r.surface)push(r.surface==='dirt'?'ダート':'芝',r);
+    const b=distBand(r.dist);if(b)push(b,r);
+  });
+  const rows=Object.entries(groups).sort((a,b)=>(b[1].ret/b[1].stake)-(a[1].ret/a[1].stake));
+  let html='<tr><th>条件</th><th>件数</th><th>的中率</th><th>回収率</th></tr>';
+  rows.forEach(([k,g])=>{const roi=g.ret/g.stake*100;const cls=roi>=100?'pos':'neg';
+    html+=`<tr><td>${k}</td><td>${g.n}</td><td>${(g.hit/g.n*100).toFixed(0)}%</td><td class="${cls}">${roi.toFixed(0)}%</td></tr>`;});
+  box.innerHTML=`<table>${html}</table><div class="hint" style="margin-top:8px">回収率の高い条件があなたの"得意"。そこに資金を寄せるのが勝ち筋です。</div>`;
+}
+function renderCalibControls(){
+  const box=document.getElementById('calibControls');if(!box)return;
+  const rec=S.records.filter(r=>r.settled&&r.predWinProb!=null&&r.predHitTop!=null);
+  if(rec.length<5){box.innerHTML=`<div class="hint">確定記録が5件以上貯まると、記録から自信度σを自動較正できます（現在 ${rec.length}件）。</div>`;return;}
+  const meanPred=rec.reduce((a,r)=>a+r.predWinProb,0)/rec.length;
+  const actual=rec.filter(r=>r.predHitTop).length/rec.length;
+  const gap=meanPred-actual;
+  const diag=Math.abs(gap)<0.03?'ほぼ最適（調整不要）':gap>0?'やや過信ぎみ（本命を高く見積もりがち）':'やや過小（本命をもっと信頼してよい）';
+  box.innerHTML=`<div class="hint" style="margin-bottom:8px">◎の予測平均 <b>${(meanPred*100).toFixed(0)}%</b> ／ 実際の的中 <b>${(actual*100).toFixed(0)}%</b>（${rec.length}件）→ <b>${diag}</b></div>
+    <button class="btn ghost sm block" id="calibBtn">記録から自信度を自動較正する</button>
+    <div class="hint" style="margin-top:6px">現在: 自信度T=${S.T} / シムσ=${S.sim.sigma}</div>`;
+  document.getElementById('calibBtn').onclick=autoCalibrate;
+}
+function autoCalibrate(){
+  const rec=S.records.filter(r=>r.settled&&r.predWinProb!=null&&r.predHitTop!=null);
+  if(rec.length<5){toast('確定5件以上で較正できます');return;}
+  const meanPred=rec.reduce((a,r)=>a+r.predWinProb,0)/rec.length;
+  const actual=rec.filter(r=>r.predHitTop).length/rec.length;
+  const gap=meanPred-actual;
+  if(Math.abs(gap)<0.03){toast('よく較正されています（調整不要）');return;}
+  if(gap>0){S.T=Math.min(34,S.T+2);S.sim.sigma=Math.min(14,+S.sim.sigma+1);}
+  else{S.T=Math.max(8,S.T-2);S.sim.sigma=Math.max(6,+S.sim.sigma-1);}
+  save();toast(gap>0?'過信を検出→控えめに較正':'過小を検出→強気に較正');renderStats();
 }
 function renderRecordList(){
   const box=document.getElementById('recordList');
@@ -813,10 +898,12 @@ function renderRecordList(){
   box.innerHTML='';
   S.records.forEach(r=>{const el=document.createElement('div');el.style.cssText='border-bottom:1px solid var(--border);padding:11px 0';
     if(r.settled){const roi=r.stake>0?(r.ret/r.stake*100).toFixed(0)+'%':'—';
-      el.innerHTML=`<div class="row" style="justify-content:space-between"><div><b>${r.name}</b> <span class="sub">${r.date}</span><br>
+      const cond=[r.surface?(r.surface==='dirt'?'ダート':'芝'):'',r.dist?r.dist+'m':''].filter(Boolean).join('・');
+      el.innerHTML=`<div class="row" style="justify-content:space-between"><div><b>${r.name}</b> <span class="sub">${r.date}${cond?' ・'+cond:''}</span><br>
         <span class="sub">1着=${r.winNum||'?'} / ◎=${r.predWinNum} ${r.hit?'<span class="chip g">的中</span>':'<span class="chip r">不的中</span>'}</span></div>
         <div style="text-align:right"><div class="sub">回収 ${roi}</div><div class="sub">${(r.ret-r.stake>=0?'+':'')}¥${(r.ret-r.stake).toLocaleString()}</div></div></div>
-        <button class="btn ghost sm" data-del="${r.id}" style="margin-top:6px">削除</button>`;
+        <input placeholder="メモ（反省・気づき）" value="${(r.memo||'').replace(/"/g,'&quot;')}" data-memo="${r.id}" style="margin-top:8px;padding:7px 9px;font-size:12px">
+        <button class="btn ghost sm" data-del="${r.id}" style="margin-top:7px">削除</button>`;
     }else{
       el.innerHTML=`<div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>${r.name}</b> <span class="sub">${r.date}</span><br>
         <span class="sub">◎${r.predWinNum}（勝率${(r.predWinProb*100).toFixed(0)}%）結果未入力</span></div><span class="chip">未確定</span></div>
@@ -827,6 +914,7 @@ function renderRecordList(){
           <button class="btn sm" data-settle="${r.id}">確定</button><button class="btn ghost sm" data-del="${r.id}">削除</button></div>`;
     }box.appendChild(el);});
   box.querySelectorAll('[data-settle]').forEach(b=>b.onclick=()=>settle(+b.dataset.settle));
+  box.querySelectorAll('[data-memo]').forEach(inp=>inp.onchange=()=>{const r=S.records.find(x=>x.id==inp.dataset.memo);if(r){r.memo=inp.value;save();}});
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.records=S.records.filter(r=>r.id!=b.dataset.del);save();renderStats();});
 }
 function settle(id){
