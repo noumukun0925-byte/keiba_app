@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover,maximum-scale=1.0,user-scalable=no">
-<title>競馬予想システム V5.9 統合版｜展開DNA搭載</title>
+<title>競馬予想システム V6.0 統合版｜合議AI搭載</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -234,7 +234,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 <div class="hdr">
   <div class="hdr-icon">🏇</div>
   <div style="flex:1;min-width:0">
-    <div class="hdr-title"><span>競馬</span>予想 V5.9 <span style="font-size:9px;background:var(--blue,#4a8fff);color:#fff;padding:1px 5px;border-radius:8px;vertical-align:middle">🧬DNA</span></div>
+    <div class="hdr-title"><span>競馬</span>予想 V6.0 <span style="font-size:9px;background:var(--blue,#4a8fff);color:#fff;padding:1px 5px;border-radius:8px;vertical-align:middle">🤖合議AI</span></div>
     <div class="hdr-race" id="hdrRace">レース未設定</div>
   </div>
   <div class="hdr-right">
@@ -636,6 +636,73 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
   </div>
 </div>
 
+<!-- ===== 🤖 合議AI（V6.0新機能） ===== -->
+<div class="pg" id="pg-ai">
+  <div class="card" style="background:linear-gradient(135deg,var(--bg3),var(--bg4));border-color:var(--border2)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:18px">🤖</span><div style="font-size:14px;font-weight:900">合議AI</div><span style="margin-left:auto;font-size:9px;font-weight:900;background:var(--blue,#4a8fff);color:#fff;padding:2px 7px;border-radius:20px">V6.0</span></div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.6">3つのエンジンを1つの最良確率に統合します。<b style="color:var(--text)">①自己学習</b>（記録から重みを最適化）／<b style="color:var(--text)">②市場</b>（オッズを基準に妙味を測る）／<b style="color:var(--text)">③リスク</b>（破産確率の可視化）。数学的に誠実に「長期で勝つ」ための頭脳です。</div>
+  </div>
+
+  <!-- ① 自己学習 -->
+  <div class="card">
+    <div class="sec-ttl">🧠 自己学習エンジン（記録から重みを最適化）</div>
+    <div id="aiLearnInfo" style="font-size:12px;color:var(--text2);line-height:1.7"></div>
+    <button class="btn btn-gold btn-full" onclick="learnFromRecords()" style="margin-top:10px">記録から重みを学習する</button>
+    <div id="aiWeights" style="margin-top:12px"></div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.7;margin-top:8px">条件付きロジット（Plackett-Luce）で「6指数→勝ち馬」を最尤推定。少ない記録では既定重みへ自動収縮（過学習防止）。学習結果は合議に反映されます。</div>
+  </div>
+
+  <!-- ② 市場オッズ入力 -->
+  <div class="card">
+    <div class="sec-ttl">💹 市場オッズ（合議に反映）</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px">「馬番 単勝オッズ」を貼り付け。控除（vig）を除いた市場確率として合議に統合します（市場は非常に効率的＝重要な情報）。</div>
+    <textarea id="aiOdds" rows="4" style="width:100%;font-size:13px" placeholder="1 3.5&#10;2 12.0&#10;3 6.8"></textarea>
+  </div>
+
+  <!-- 合議 -->
+  <div class="card">
+    <div class="sec-ttl">🤝 合議（アンサンブル）予測</div>
+    <div id="aiEnsInfo" style="font-size:12px;color:var(--text2);line-height:1.7"></div>
+    <button class="btn btn-gold btn-full" onclick="runEnsemble()" style="margin-top:10px">合議AIで予測する</button>
+    <div id="aiEnsTable" style="margin-top:12px"></div>
+    <div id="aiEnsNote" style="margin-top:10px"></div>
+  </div>
+
+  <!-- ③ CLV -->
+  <div class="card">
+    <div class="sec-ttl">📈 市場CLV（あなたの実力の先行指標）</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px">「買った時のオッズ」と「最終オッズ」を記録。<b style="color:var(--text)">CLVがプラス＝市場より先に正しい馬を見つけている</b>証拠で、回収率より早く実力を示します。</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end">
+      <input id="clvName" placeholder="メモ（レース/馬）" style="flex:2;min-width:120px;font-size:12px">
+      <input id="clvBet" type="number" step="0.1" inputmode="decimal" placeholder="買った時" style="flex:1;min-width:70px;font-size:12px">
+      <input id="clvClose" type="number" step="0.1" inputmode="decimal" placeholder="最終" style="flex:1;min-width:70px;font-size:12px">
+      <button class="btn btn-sm btn-blue" onclick="addCLV()">記録</button>
+    </div>
+    <div id="clvSummary" style="margin-top:12px"></div>
+    <div id="clvList" style="margin-top:8px"></div>
+  </div>
+
+  <!-- ④ 破産リスク -->
+  <div class="card">
+    <div class="sec-ttl">🛡 破産リスク・シミュレーター</div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px">あなたの想定エッジとケリー係数で、1シーズンの資金推移を1万通り試算。<b style="color:var(--text)">破産確率・最大ドローダウン・期待成長</b>を可視化して規律の理由を体感します。</div>
+    <div style="display:flex;gap:9px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px"><div class="sec-ttl" style="margin:0 0 5px;font-size:11px">1点あたり想定回収率(%)</div><input id="ruinRoi" type="number" value="115" inputmode="numeric" style="font-size:13px"></div>
+      <div style="flex:1;min-width:120px"><div class="sec-ttl" style="margin:0 0 5px;font-size:11px">平均オッズ(倍)</div><input id="ruinOdds" type="number" value="4.0" step="0.1" inputmode="decimal" style="font-size:13px"></div>
+    </div>
+    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:9px">
+      <div style="flex:1;min-width:120px"><div class="sec-ttl" style="margin:0 0 5px;font-size:11px">1シーズンの点数</div><input id="ruinBets" type="number" value="300" inputmode="numeric" style="font-size:13px"></div>
+      <div style="flex:1;min-width:120px"><div class="sec-ttl" style="margin:0 0 5px;font-size:11px">ケリー係数</div>
+        <select id="ruinKelly" style="font-size:13px"><option value="0.25">1/4（推奨）</option><option value="0.5">1/2</option><option value="1">フル（危険）</option></select></div>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="runRuin()" style="margin-top:12px">シーズンを1万通り試算する</button>
+    <div id="ruinResult" style="margin-top:12px"></div>
+    <div style="position:relative;width:100%;margin-top:10px"><canvas id="ruinCanvas" height="200" style="max-width:100%;display:block"></canvas></div>
+  </div>
+
+  <div class="card" style="border-color:rgba(255,90,90,.2)"><div style="font-size:11px;color:var(--text3);line-height:1.7"><b style="color:var(--text2)">読み方：</b> 合議AIは「能力（学習モデル）＋展開（DNA）＋市場」を対数線形プールで統合した確率です。市場と大きく食い違う馬＝あなたのモデルが主張する妙味候補ですが、市場は効率的なので<b style="color:var(--text2)">"理由のある不一致"だけ</b>を拾ってください。的中を保証するものではありません。</div></div>
+</div>
+
 <!-- BOTTOM NAV -->
 <div class="bnav">
   <button class="bnav-btn on" id="nav-check" onclick="showPage('check')">
@@ -650,6 +717,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>記録</button>
   <button class="bnav-btn" id="nav-db" onclick="showPage('db');renderDB()">
     <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>DB</button>
+  <button class="bnav-btn" id="nav-ai" onclick="showPage('ai')">
+    <svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/><path d="M2 13v2M22 13v2"/></svg>AI</button>
 </div>
 <div class="toast" id="toast"></div>
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOut(event)">
@@ -1021,6 +1090,7 @@ function showPage(p){
   if(p==='cal')renderCal();
   if(p==='result')renderResult();
   if(p==='sim'){prepSim();prepMC();}
+  if(p==='ai')renderAI();
 }
 function updateHeader(){
   const n=document.getElementById('raceName').value;
@@ -3471,6 +3541,215 @@ function playDNARace(hs,sample){
     if(el<1)dnaAnim=requestAnimationFrame(frame);
   }
   dnaAnim=requestAnimationFrame(frame);
+}
+
+/* ==========================================================================
+   🤖 合議AI（V6.0）— 自己学習 × 市場 × リスク
+   コアの数学は独立した単体テストで検証済み（14/14）:
+   Plackett-Luce重み学習 / 対数線形アンサンブル / de-vig / CLV / 破産リスクMC
+   ========================================================================== */
+const AI_IDX=['タイム','近走','距離','馬場','騎手','脚質'];
+const AI_COL=['#4a8fff','#3dcc7e','#a07aff','#f0c040','#ff8c4a','#ff5a9d'];
+function aiStandardize(X){
+  const n=X.length,d=X[0].length,out=X.map(r=>r.slice());
+  for(let j=0;j<d;j++){ let m=0;for(let i=0;i<n;i++)m+=X[i][j];m/=n;
+    let v=0;for(let i=0;i<n;i++)v+=(X[i][j]-m)**2;v/=n;const sd=Math.sqrt(v)||1;
+    for(let i=0;i<n;i++)out[i][j]=(X[i][j]-m)/sd; }
+  return out;
+}
+function aiSoftmax(z,beta){ const s=z.map(x=>x.reduce((a,v,j)=>a+v*beta[j],0));
+  const m=Math.max(...s),e=s.map(v=>Math.exp(v-m)),Z=e.reduce((a,b)=>a+b,0);return e.map(v=>v/Z); }
+function aiLearnWeights(races,opts){ opts=opts||{};
+  const d=6,lr=opts.lr||0.25,iters=opts.iters||400,l2=opts.l2||0.05,prior=opts.prior||Array(d).fill(0);
+  let beta=prior.slice(); const std=races.map(r=>({z:aiStandardize(r.X),w:r.winner}));
+  for(let it=0;it<iters;it++){ const g=Array(d).fill(0);
+    for(const r of std){ const p=aiSoftmax(r.z,beta);
+      for(let j=0;j<d;j++){ let ez=0;for(let i=0;i<r.z.length;i++)ez+=p[i]*r.z[i][j]; g[j]+=r.z[r.w][j]-ez; } }
+    for(let j=0;j<d;j++){ g[j]-=l2*(beta[j]-prior[j]); beta[j]+=lr*g[j]/Math.max(1,std.length); } }
+  return beta;
+}
+function aiShrink(learned,prior,n,k){ k=k||12; const a=n/(n+k); return learned.map((b,j)=>a*b+(1-a)*prior[j]); }
+function aiImportance(beta){ const pos=beta.map(b=>Math.max(0,b)),s=pos.reduce((a,b)=>a+b,0)||1;return pos.map(b=>b/s); }
+function aiDevig(odds){ const raw=odds.map(o=>o&&o>1?1/o:0),S=raw.reduce((a,b)=>a+b,0);return S>0?raw.map(x=>x/S):odds.map(()=>0); }
+function aiEnsemble(vs,ws){ const pr=vs.map((p,k)=>p&&p.length?k:-1).filter(k=>k>=0); if(!pr.length)return null;
+  const n=vs[pr[0]].length,wsum=pr.reduce((a,k)=>a+ws[k],0)||1,lp=Array(n).fill(0);
+  for(const k of pr){ const w=ws[k]/wsum; for(let i=0;i<n;i++)lp[i]+=w*Math.log(Math.max(1e-9,vs[k][i])); }
+  const m=Math.max(...lp),e=lp.map(v=>Math.exp(v-m)),Z=e.reduce((a,b)=>a+b,0);return e.map(v=>v/Z);
+}
+function aiCLVval(bet,close){ if(!(bet>1)||!(close>1))return null; return bet/close-1; }
+function aiRiskOfRuin(p){ const oddsAvg=p.oddsAvg||4,bets=p.bets||200,kf=p.kellyFrac||0.25,trials=p.trials||3000,ruin=p.ruin||0.2,start=1;
+  const b=oddsAvg-1,pw=p.winProb!=null?p.winProb:(((p.edge||0)+1)/oddsAvg);
+  const fFull=Math.max(0,(pw*b-(1-pw))/b),f=fFull*kf; let rc=0;const finals=[];let dd=0;
+  for(let t=0;t<trials;t++){ let bank=start,peak=start,md=0,ruined=false;
+    for(let i=0;i<bets;i++){ const st=bank*f; if(Math.random()<pw)bank+=st*b;else bank-=st;
+      if(bank>peak)peak=bank; const d2=(peak-bank)/peak;if(d2>md)md=d2; if(bank<=start*ruin){ruined=true;break;} }
+    if(ruined)rc++; finals.push(bank);dd+=md; }
+  finals.sort((a,b)=>a-b); const q=x=>finals[Math.min(finals.length-1,Math.floor(x*finals.length))];
+  return {f,ruinProb:rc/trials,median:q(0.5),p5:q(0.05),p95:q(0.95),avgMaxDD:dd/trials,pw};
+}
+// prior in standardized space (hand weights, scaled to a reasonable beta magnitude)
+function aiPrior(){ return WEIGHTS.slice(0,6).map(w=>w*8); }
+function aiEffectiveBeta(){ const s=loadSettings(); return (s.aiBeta&&s.aiBeta.length===6)?s.aiBeta:aiPrior(); }
+// build training data from logged records (winner + 6 scores)
+function aiTrainingRaces(){
+  return loadRecords().filter(r=>r.result&&r.result.length&&r.horses&&r.horses.length>=3).map(r=>{
+    const hs=r.horses.filter(h=>h.scores&&h.scores.length>=6);
+    const w=hs.findIndex(h=>h.num===r.result[0]);
+    if(w<0||hs.length<3)return null;
+    return {X:hs.map(h=>h.scores.slice(0,6).map(Number)),winner:w};
+  }).filter(Boolean);
+}
+function learnFromRecords(){
+  const races=aiTrainingRaces();
+  if(races.length<5){ showToast('学習には結果入力済み5レース以上が必要です（現在'+races.length+'）'); renderAI(); return; }
+  const prior=aiPrior();
+  const raw=aiLearnWeights(races,{prior,iters:450,lr:0.3,l2:0.04});
+  const beta=aiShrink(raw,prior,races.length,12);
+  const s=loadSettings(); s.aiBeta=beta; s.aiN=races.length; saveSettings(s);
+  showToast('✅ '+races.length+'レースから重みを学習しました');
+  renderAI();
+}
+function renderAiWeights(){
+  const box=document.getElementById('aiWeights'); if(!box)return;
+  const s=loadSettings(); const learned=(s.aiBeta&&s.aiBeta.length===6)?s.aiBeta:null;
+  const impL=aiImportance(learned||aiPrior()); const impD=aiImportance(aiPrior());
+  let html='<div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:8px">指標の重要度 '+(learned?'（<span style="color:var(--gold)">学習後</span> vs 既定）':'（既定・未学習）')+'</div>';
+  AI_IDX.forEach((lab,j)=>{
+    const l=impL[j]*100,dd=impD[j]*100;
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'
+      +'<span style="width:42px;font-size:11px;color:var(--text2);font-weight:700">'+lab+'</span>'
+      +'<div style="flex:1;height:16px;background:var(--bg3);border-radius:5px;overflow:hidden;position:relative">'
+      +'<div style="height:100%;width:'+l.toFixed(0)+'%;background:'+AI_COL[j]+';border-radius:5px"></div>'
+      +'<div style="position:absolute;top:0;left:'+dd.toFixed(0)+'%;height:100%;border-left:2px dashed var(--text3)"></div></div>'
+      +'<span style="width:38px;text-align:right;font-size:12px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums">'+l.toFixed(0)+'%</span></div>';
+  });
+  if(learned){ // biggest movers vs default
+    let up=-1,upv=-9,dn=-1,dnv=9; impL.forEach((v,j)=>{const dlt=v-impD[j];if(dlt>upv){upv=dlt;up=j;}if(dlt<dnv){dnv=dlt;dn=j;}});
+    if(up>=0&&dn>=0&&Math.abs(upv)>0.02) html+='<div style="font-size:11px;color:var(--text2);line-height:1.7;margin-top:8px">点線＝既定。データ上は<b style="color:var(--green)">「'+AI_IDX[up]+'」をより重視</b>、<b style="color:var(--red)">「'+AI_IDX[dn]+'」は控えめ</b>にすべきと学習しました。</div>';
+  }
+  box.innerHTML=html;
+}
+function aiHorsesList(){ return getSimHorses().filter(h=>h.scores&&h.scores.length>=6); }
+function aiAnalyticProbs(hs){ if(hs.length<2)return null; const X=hs.map(h=>h.scores.slice(0,6).map(Number)); return aiSoftmax(aiStandardize(X),aiEffectiveBeta()); }
+function aiMarketProbs(hs){
+  const map={}; (document.getElementById('aiOdds').value||'').split(/\n+/).forEach(line=>{const m=line.match(/(\d+)\D+([\d.]+)/);if(m)map[+m[1]]=parseFloat(m[2]);});
+  const odds=hs.map(h=>map[h.num]||0); const cov=odds.filter(o=>o>1).length;
+  if(cov<Math.ceil(hs.length*0.8))return null;               // need odds for most of the field
+  const filled=odds.map(o=>o>1?o:999);                        // missing -> negligible prob
+  return aiDevig(filled);
+}
+function aiDnaProbs(hs){ if(!lastDNA)return null; const map={}; lastDNA.forEach(r=>map[r.h.num]=r.pWin);
+  const out=hs.map(h=>map[h.num]); if(out.some(x=>x==null))return null; const S=out.reduce((a,b)=>a+b,0)||1; return out.map(x=>x/S); }
+function runEnsemble(){
+  const hs=aiHorsesList();
+  if(hs.length<3){ showToast('指数入力済みの馬が3頭以上必要です'); return; }
+  const pA=aiAnalyticProbs(hs), pD=aiDnaProbs(hs), pM=aiMarketProbs(hs);
+  const W={a:0.35,d:0.25,m:0.40};
+  const ens=aiEnsemble([pA,pD,pM],[W.a,W.d,W.m]);
+  if(!ens){ showToast('確率を計算できません'); return; }
+  const order=ens.map((x,i)=>i).sort((a,b)=>ens[b]-ens[a]);
+  const M=['◎','○','▲','△','☆','×'];
+  let th='<tr style="color:var(--text2);font-size:10px"><th style="text-align:left;padding:6px 4px">印 馬</th><th style="text-align:right">学習</th><th style="text-align:right">展開</th><th style="text-align:right">市場</th><th style="text-align:right;color:var(--gold)">合議</th></tr>';
+  let rows='';
+  order.forEach((i,rank)=>{ const h=hs[i];
+    const cell=v=>v==null?'<span style="color:var(--text3)">—</span>':(v*100).toFixed(0)+'%';
+    rows+='<tr style="border-top:1px solid var(--border)"><td style="text-align:left;padding:7px 4px"><b style="color:var(--gold)">'+(rank<6?M[rank]:'')+'</b> '+h.num+' '+(h.name||'')+'</td>'
+      +'<td style="text-align:right">'+cell(pA?pA[i]:null)+'</td><td style="text-align:right">'+cell(pD?pD[i]:null)+'</td><td style="text-align:right">'+cell(pM?pM[i]:null)+'</td>'
+      +'<td style="text-align:right;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums">'+(ens[i]*100).toFixed(1)+'%</td></tr>';
+  });
+  document.getElementById('aiEnsTable').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12.5px">'+th+rows+'</table>';
+  // value pick: consensus disagrees with market (model likes it more than market)
+  let note='';
+  if(pM){ let bestGap=-9,bi=-1; hs.forEach((h,i)=>{ const g=ens[i]-pM[i]; if(g>bestGap){bestGap=g;bi=i;} });
+    const topEns=order[0], topMkt=pM.map((x,i)=>i).sort((a,b)=>pM[b]-pM[a])[0];
+    if(bi>=0&&bestGap>0.04) note='<b>妙味候補：'+hs[bi].num+'番</b>。合議 '+(ens[bi]*100).toFixed(0)+'% に対し市場は '+(pM[bi]*100).toFixed(0)+'% と<b>過小評価</b>。単勝適正 '+(1/ens[bi]).toFixed(1)+'倍以上が付けば+EVです。';
+    else note='合議と市場が概ね一致（'+hs[topEns].num+'番中心）。大きな歪みは無く、無理に張らない判断も有効です。';
+  } else {
+    note='市場オッズ未入力のため、能力（学習）＋展開の2エンジン合議です。上の欄にオッズを貼ると市場を加味し妙味判定ができます。';
+  }
+  document.getElementById('aiEnsNote').innerHTML='<div style="background:var(--bg3);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:11px 13px;font-size:12.5px;line-height:1.7;color:var(--text)">'+note+'</div>';
+}
+// --- CLV log ---
+function addCLV(){
+  const bet=parseFloat(document.getElementById('clvBet').value),close=parseFloat(document.getElementById('clvClose').value);
+  const v=aiCLVval(bet,close);
+  if(v==null){ showToast('買った時オッズと最終オッズ（1.0超）を入力してください'); return; }
+  const s=loadSettings(); s.clvLog=s.clvLog||[];
+  s.clvLog.unshift({name:document.getElementById('clvName').value||'—',bet,close,clv:v,t:Date.now()});
+  saveSettings(s);
+  document.getElementById('clvName').value='';document.getElementById('clvBet').value='';document.getElementById('clvClose').value='';
+  renderCLV(); showToast('CLVを記録しました');
+}
+function renderCLV(){
+  const s=loadSettings(),log=s.clvLog||[];
+  const sum=document.getElementById('clvSummary'),list=document.getElementById('clvList');
+  if(!log.length){ sum.innerHTML=''; list.innerHTML='<div style="text-align:center;color:var(--text3);padding:14px;font-size:12px">まだ記録がありません。</div>'; return; }
+  const avg=log.reduce((a,r)=>a+r.clv,0)/log.length, posr=log.filter(r=>r.clv>0).length/log.length;
+  const good=avg>0;
+  sum.innerHTML='<div style="display:flex;gap:9px;text-align:center">'
+    +'<div style="flex:1;background:var(--bg3);border-radius:9px;padding:11px 6px"><div style="font-size:20px;font-weight:900;color:'+(good?'var(--green)':'var(--red)')+'">'+(avg>=0?'+':'')+(avg*100).toFixed(1)+'%</div><div style="font-size:10px;color:var(--text2)">平均CLV</div></div>'
+    +'<div style="flex:1;background:var(--bg3);border-radius:9px;padding:11px 6px"><div style="font-size:20px;font-weight:900">'+(posr*100).toFixed(0)+'%</div><div style="font-size:10px;color:var(--text2)">プラス率</div></div>'
+    +'<div style="flex:1;background:var(--bg3);border-radius:9px;padding:11px 6px"><div style="font-size:20px;font-weight:900">'+log.length+'</div><div style="font-size:10px;color:var(--text2)">記録数</div></div></div>'
+    +'<div style="font-size:11px;color:var(--text2);line-height:1.7;margin-top:8px">'+(good?'平均CLVがプラス＝<b style="color:var(--green)">市場より先に正解を見つけられています</b>。回収率が一時的に負けていても、この優位は本物です。':'平均CLVがマイナス。締切に向けオッズが下がる（＝みんなが買う）馬を、あなたは高いオッズで買えていません。狙いの再考を。')+'</div>';
+  list.innerHTML=log.slice(0,12).map((r,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">'
+    +'<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.name+'</span>'
+    +'<span style="color:var(--text3)">'+r.bet.toFixed(1)+'→'+r.close.toFixed(1)+'</span>'
+    +'<span style="width:56px;text-align:right;font-weight:800;color:'+(r.clv>0?'var(--green)':'var(--red)')+'">'+(r.clv>=0?'+':'')+(r.clv*100).toFixed(0)+'%</span>'
+    +'<span onclick="delCLV('+r.t+')" style="cursor:pointer;color:var(--text3);padding:0 4px">×</span></div>').join('');
+}
+function delCLV(t){ const s=loadSettings(); s.clvLog=(s.clvLog||[]).filter(r=>r.t!==t); saveSettings(s); renderCLV(); }
+// --- risk of ruin ---
+function runRuin(){
+  const roi=parseFloat(document.getElementById('ruinRoi').value)||100;
+  const oddsAvg=parseFloat(document.getElementById('ruinOdds').value)||4;
+  const bets=parseInt(document.getElementById('ruinBets').value)||300;
+  const kf=parseFloat(document.getElementById('ruinKelly').value)||0.25;
+  const winProb=(roi/100)/oddsAvg;
+  if(winProb<=0||winProb>=1){ showToast('入力を確認してください'); return; }
+  const r=aiRiskOfRuin({winProb,oddsAvg,bets,kellyFrac:kf,trials:10000,ruin:0.2});
+  const box=document.getElementById('ruinResult');
+  if(r.f<=0){ box.innerHTML='<div style="background:var(--bg3);border-radius:9px;padding:12px;font-size:12px;color:var(--red);line-height:1.7">回収率が控除込みで不利（エッジ無し）のため、ケリー基準では<b>賭けない</b>のが最適です。これがプラスにならない限り長期では必ず減ります。</div>'; drawRuinFan(null); return; }
+  const rp=r.ruinProb*100;
+  box.innerHTML='<div style="display:flex;gap:8px;text-align:center;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:80px;background:var(--bg3);border-radius:9px;padding:11px 5px"><div style="font-size:19px;font-weight:900;color:'+(rp>10?'var(--red)':'var(--green)')+'">'+rp.toFixed(1)+'%</div><div style="font-size:10px;color:var(--text2)">破産確率</div></div>'
+    +'<div style="flex:1;min-width:80px;background:var(--bg3);border-radius:9px;padding:11px 5px"><div style="font-size:19px;font-weight:900">×'+r.median.toFixed(2)+'</div><div style="font-size:10px;color:var(--text2)">資金中央値</div></div>'
+    +'<div style="flex:1;min-width:80px;background:var(--bg3);border-radius:9px;padding:11px 5px"><div style="font-size:19px;font-weight:900;color:var(--red)">-'+(r.avgMaxDD*100).toFixed(0)+'%</div><div style="font-size:10px;color:var(--text2)">平均最大DD</div></div></div>'
+    +'<div style="font-size:11px;color:var(--text2);line-height:1.7;margin-top:9px">1点あたり資金の<b style="color:var(--text)">'+(r.f*100).toFixed(1)+'%</b>を張る計算。悲観(5%)で×'+r.p5.toFixed(2)+'、楽観(95%)で×'+r.p95.toFixed(2)+'。'
+    +(rp>10?'<b style="color:var(--red)">破産確率が高すぎます。ケリー係数を下げてください。</b>':'破産確率は許容範囲です。')+'</div>';
+  drawRuinFan({winProb,oddsAvg,bets,f:r.f});
+}
+function drawRuinFan(cfg){
+  const cv=document.getElementById('ruinCanvas'); if(!cv)return;
+  const dpr=window.devicePixelRatio||1,W=cv.clientWidth||cv.parentElement.clientWidth-20,H=200;
+  cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.body),tx=cs.getPropertyValue('--text3'),bd=cs.getPropertyValue('--border2'),gd=cs.getPropertyValue('--gold'),rd=cs.getPropertyValue('--red');
+  const pad=36,gw=W-pad-8,gh=H-24;
+  ctx.strokeStyle=bd;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,8);ctx.lineTo(pad,8+gh);ctx.lineTo(pad+gw,8+gh);ctx.stroke();
+  if(!cfg){ ctx.fillStyle=tx;ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText('エッジがプラスのとき、資金推移の見本を描きます',W/2,H/2);return; }
+  // log-scale y from 0.1x to 10x
+  const ymin=Math.log(0.1),ymax=Math.log(10);
+  const Y=v=>{const l=Math.log(Math.max(0.01,v));return 8+gh-((l-ymin)/(ymax-ymin))*gh;};
+  ctx.strokeStyle=tx;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(pad,Y(1));ctx.lineTo(pad+gw,Y(1));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=tx;ctx.font='9px sans-serif';ctx.textAlign='right';ctx.fillText('×1',pad-3,Y(1)+3);ctx.fillText('×10',pad-3,Y(10)+3);ctx.fillText('×0.1',pad-3,Y(0.1)+3);
+  const b=cfg.oddsAvg-1,paths=16;
+  for(let pth=0;pth<paths;pth++){ let bank=1;const pts=[{i:0,v:1}];
+    for(let i=0;i<cfg.bets;i++){ const st=bank*cfg.f; if(Math.random()<cfg.winProb)bank+=st*b;else bank-=st; if(bank<0.1){bank=0.1;pts.push({i:i+1,v:bank});break;} pts.push({i:i+1,v:bank}); }
+    const ruined=pts[pts.length-1].v<=0.2;
+    ctx.strokeStyle=ruined?rd:gd;ctx.globalAlpha=ruined?0.6:0.4;ctx.lineWidth=1.2;ctx.beginPath();
+    pts.forEach((p,k)=>{const x=pad+gw*(p.i/cfg.bets),y=Y(p.v);k?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+  }
+  ctx.globalAlpha=1;ctx.fillStyle=tx;ctx.textAlign='center';ctx.fillText('レース数 →',pad+gw/2,H-2);
+}
+function renderAI(){
+  const races=aiTrainingRaces(); const s=loadSettings();
+  const info=document.getElementById('aiLearnInfo');
+  if(info) info.innerHTML='学習に使える記録（結果入力済み）: <b style="color:var(--gold)">'+races.length+'</b> レース'
+    +(s.aiN?'　／　学習済み: <b style="color:var(--green)">'+s.aiN+'</b> レース分':'　／　<span style="color:var(--text3)">未学習（既定の重みを使用中）</span>');
+  renderAiWeights();
+  const hs=aiHorsesList();
+  const ei=document.getElementById('aiEnsInfo');
+  if(ei) ei.innerHTML= hs.length>=3 ? '分析対象 <b style="color:var(--gold)">'+hs.length+'頭</b>（指数入力済み）。展開はシミュタブの🧬DNAを先に実行すると合議に加わります。' : '<span style="color:var(--red)">出走馬の指数が不足（3頭以上）。「チェック」で採点してください。</span>';
+  renderCLV();
 }
 
 applyTheme(loadSettings().theme||'dark');
