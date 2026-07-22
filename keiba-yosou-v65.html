@@ -525,10 +525,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div id="dnaResults" style="display:none">
       <div class="card">
         <div class="sec-ttl">🎬 レース再生（代表的な1レース）</div>
-        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:6px"><canvas id="dnaRaceCanvas" height="220" style="max-width:100%;display:block"></canvas>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);font-weight:700;margin-top:6px"><span>発走</span><span>1角</span><span>2角</span><span>3角</span><span>4角</span><span>直線</span></div></div>
+        <div style="background:radial-gradient(ellipse at 50% 42%,#ffffff,#e7eeea 70%,#dbe6df);border:1px solid var(--border);border-radius:10px;padding:8px;margin-top:6px"><canvas id="dnaRaceCanvas" height="300" style="max-width:100%;display:block"></canvas>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#5a7266;font-weight:700;margin-top:4px"><span>発走</span><span>1角</span><span>2角</span><span>3角</span><span>4角</span><span>直線</span></div></div>
         <div style="display:flex;gap:9px;align-items:center;margin-top:9px"><button class="btn btn-full" style="background:var(--bg3);color:var(--text);border:1px solid var(--border)" onclick="replayDNA()">▶ もう一度再生</button><div id="dnaPodium" style="display:flex;gap:7px;flex:1;justify-content:center"></div></div>
-        <button class="btn btn-gold btn-full" onclick="open3DSim()" style="margin-top:9px">🎥 3D立体コースで見る（勾配・距離を再現）</button>
+        <button class="btn btn-gold btn-full" onclick="open3DSim()" style="margin-top:9px">🔍 全画面の大きな3Dで見る</button>
       </div>
 
       <div class="card">
@@ -3535,7 +3535,7 @@ function runDNA(){
   else note='<b>能力の中心は'+hs[anTop].num+'番、展開込みの中心は'+hs[simTop].num+'番。</b>'+hs[simTop].num+'番（'+DNA_STYLE[hs[simTop].style].label+'）は展開の後押しで勝率'+(res.win[simTop]*100).toFixed(0)+'%へ上昇——<b>ペースが向く"妙味の穴"</b>候補です。';
   document.getElementById('dnaConsensus').innerHTML=note;
   document.getElementById('dnaResults').style.display='block';
-  dnaPodium(hs,res.sample); playDNARace(hs,res.sample);
+  dnaPodium(hs,res.sample); playDNA3D(hs,res.sample);
   showToast('展開DNAシミュレーション完了');
 }
 function dnaPodium(hs,sample){
@@ -3544,7 +3544,22 @@ function dnaPodium(hs,sample){
     return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center;min-width:56px"><div style="font-size:9px;font-weight:800;color:var(--text3)">'+labs[r]+'</div><div style="font-size:16px;font-weight:900;color:'+(r===0?'var(--gold)':'var(--text)')+'">'+x.num+'</div></div>';
   }).join('');
 }
-function replayDNA(){ if(lastDNASample)playDNARace(lastDNASample.hs,lastDNASample.sample); }
+function replayDNA(){ if(lastDNASample)playDNA3D(lastDNASample.hs,lastDNASample.sample); }
+// 3D diorama rendered directly in the DNA results card (default view, no button needed)
+let _dnaSim3d=null,_dnaAnim=null,_dnaProg=0;
+function playDNA3D(hs,sample){
+  const cv=document.getElementById('dnaRaceCanvas'); if(!cv||!sample)return;
+  if(!_dnaSim3d)_dnaSim3d=new Sim3D(cv);
+  const course=document.getElementById('raceCourse').value,dist=parseInt(document.getElementById('raceDist').value)||2000;
+  const surf=document.getElementById('raceSurface').value,going=document.getElementById('raceTrack').value||'良';
+  _dnaSim3d.setRace(course,dist,surf,going);
+  _dnaSim3d.setHorses(hs.map(x=>({num:x.num,frame:(x.h&&x.h.frame)||x.frame||0})));
+  _dnaSim3d.setSample(sample);
+  if(_dnaAnim)cancelAnimationFrame(_dnaAnim);
+  requestAnimationFrame(()=>{ _dnaSim3d.resize(); _dnaProg=0;
+    const step=()=>{ _dnaProg+=0.0033; if(_dnaProg>=1){_dnaProg=1;_dnaSim3d.draw(1);_dnaAnim=null;return;} _dnaSim3d.draw(_dnaProg); _dnaAnim=requestAnimationFrame(step); };
+    _dnaAnim=requestAnimationFrame(step); });
+}
 function playDNARace(hs,sample){
   if(!sample)return;
   const cv=document.getElementById('dnaRaceCanvas'); if(!cv)return;
